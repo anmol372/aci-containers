@@ -16,19 +16,14 @@
 package controller
 
 import (
-	"fmt"
-	"net"
-	"strconv"
-	"testing"
-	"time"
-
-	"github.com/noironetworks/aci-containers/pkg/apicapi"
 	erspanpolicy "github.com/noironetworks/aci-containers/pkg/erspanpolicy/apis/aci.erspan/v1alpha"
 	podIfpolicy "github.com/noironetworks/aci-containers/pkg/gbpcrd/apis/acipolicy/v1"
 	"github.com/noironetworks/aci-containers/pkg/ipam"
 	tu "github.com/noironetworks/aci-containers/pkg/testutil"
-	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"net"
+	"testing"
+	"time"
 )
 
 type erspanTest struct {
@@ -45,11 +40,19 @@ type podifdata struct {
 	AppProfile string
 }
 
+type spanpolicy struct {
+	name      string
+	namespace string
+	dest      erspanpolicy.ErspanDestType
+	source    erspanpolicy.ErspanSourceType
+	labels    map[string]string
+}
+
 func staticErspanKey() string {
 	return "kube_nfp_static"
 }
 
-func erspanpol(name string, namespace string, dest erspanpolicy.ErspanDestType,
+func spanpolicydata(name string, namespace string, dest erspanpolicy.ErspanDestType,
 	source erspanpolicy.ErspanSourceType, labels map[string]string) *erspanpolicy.ErspanPolicy {
 	policy := &erspanpolicy.ErspanPolicy{
 		Spec: erspanpolicy.ErspanPolicySpec{
@@ -70,6 +73,42 @@ func erspanpol(name string, namespace string, dest erspanpolicy.ErspanDestType,
 	return policy
 }
 
+var erspanDestType1 = erspanpolicy.ErspanDestType{
+	DestIP: "1.1.1.1",
+	FlowID: 2,
+}
+
+var erspanDestType2 = erspanpolicy.ErspanDestType{
+	DestIP: "1.1.1.1",
+}
+
+var erspanSourceType1 = erspanpolicy.ErspanSourceType{
+	AdminState: "start",
+	Direction:  "both",
+}
+
+var erspanSourceType2 = erspanpolicy.ErspanSourceType{
+	AdminState: "",
+	Direction:  "",
+}
+
+var spanTests = []spanpolicy{
+	{
+		"span_policy1",
+		"testns",
+		erspanDestType1,
+		erspanSourceType1,
+		map[string]string{"key": "value"},
+	},
+	{
+		"span_policy2",
+		"testns",
+		erspanDestType2,
+		erspanSourceType2,
+		map[string]string{"key": "value"},
+	},
+}
+
 func podifinfodata(name string, namespace string, macaddr string,
 	epg string) *podIfpolicy.PodIF {
 	podifinfo := &podIfpolicy.PodIF{
@@ -83,47 +122,6 @@ func podifinfodata(name string, namespace string, macaddr string,
 		},
 	}
 	return podifinfo
-}
-
-func buildSpanObjs(name string, dstIP string, flowID int, adminSt string,
-	dir string, macs []string, vpcs []string) bool {
-
-	srcGrp := apicapi.NewSpanVSrcGrp(name)
-	srcGrp.SetAttr("adminSt", adminSt)
-	apicSlice := apicapi.ApicSlice{srcGrp}
-	srcName := name + "_Src"
-	src := apicapi.NewSpanVSrc(srcGrp.GetDn(), srcName)
-	src.SetAttr("dir", dir)
-	srcGrp.AddChild(src)
-	for _, mac := range macs {
-		fvCEpDn := fmt.Sprintf("uni/tn-%s/ap-%s/epg-%s/cep-%s",
-			"consul", "test-ap", "default", mac)
-		srcCEp := apicapi.NewSpanRsSrcToVPort(src.GetDn(), fvCEpDn)
-		src.AddChild(srcCEp)
-	}
-	lbl := apicapi.NewSpanSpanLbl(srcGrp.GetDn(), name)
-	srcGrp.AddChild(lbl)
-
-	destGrp := apicapi.NewSpanVDestGrp(name)
-	destName := name + "_Dest"
-	dest := apicapi.NewSpanVDest(destGrp.GetDn(), destName)
-	destGrp.AddChild(dest)
-	destSummary := apicapi.NewSpanVEpgSummary(dest.GetDn())
-	destSummary.SetAttr("dstIp", dstIP)
-	destSummary.SetAttr("flowId", strconv.Itoa(flowID))
-	dest.AddChild(destSummary)
-	apicSlice = append(apicSlice, destGrp)
-	for _, vpc := range vpcs {
-		accBndlGrp := apicapi.NewInfraAccBndlGrp(vpc)
-		infraRsSpanVSrcGrp := apicapi.NewInfraRsSpanVSrcGrp(vpc, name)
-		accBndlGrp.AddChild(infraRsSpanVSrcGrp)
-		apicSlice = append(apicSlice, infraRsSpanVSrcGrp)
-		infraRsSpanVDstGrp := apicapi.NewInfraRsSpanVDestGrp(vpc, name)
-		accBndlGrp.AddChild(infraRsSpanVDstGrp)
-		apicSlice = append(apicSlice, infraRsSpanVDstGrp)
-	}
-	return false
-
 }
 
 func checkDeleteErspan(t *testing.T, spanTest erspanTest, cont *testAciController) {
@@ -181,34 +179,6 @@ func podifwait(t *testing.T, desc string, expected map[string]podifdata,
 
 func TestErspanPolicy(t *testing.T) {
 	cont := testController()
-	name := "kube_span_test"
-	labels := map[string]string{"lab_key1": "lab_value1"}
-	macs := []string{"C2-85-53-A1-85-60", "E4-81-80-40-26-CD"}
-	vpcs := []string{"test-vpc1", "test-vpc2"}
-
-	var dest0 erspanpolicy.ErspanDestType
-	dest0.DestIP = "172.51.1.2"
-	dest0.FlowID = 10
-
-	var dest1 erspanpolicy.ErspanDestType
-	dest1.DestIP = "172.51.1.2"
-
-	var src0 erspanpolicy.ErspanSourceType
-	src0.AdminState = "start"
-	src0.Direction = "out"
-
-	var src1 erspanpolicy.ErspanSourceType
-	src1.AdminState = ""
-	src1.Direction = ""
-
-	var spanTests = []erspanTest{
-		{erspanpol("test", "testns", dest0, src0, labels),
-			buildSpanObjs(name, "172.51.1.2", 10, "start", "out", macs, vpcs), "test1", true},
-		{erspanpol("test", "testns", dest0, src1, labels),
-			buildSpanObjs(name, "172.51.1.2", 10, "start", "both", macs, vpcs), "test2", true},
-		{erspanpol("test", "testns", dest1, src1, labels),
-			buildSpanObjs(name, "172.51.1.2", 1, "start", "both", macs, vpcs), "test3", true},
-	}
 	initCont := func() *testAciController {
 		cont := testController()
 		cont.config.NodeServiceIpPool = []ipam.IpRange{
@@ -228,34 +198,29 @@ func TestErspanPolicy(t *testing.T) {
 
 		return cont
 	}
-
-	ips := []string{
-		"1.1.1.1", "1.1.1.2", "1.1.1.3", "1.1.1.4", "1.1.1.5", "",
-	}
-
 	//Function to check if erspan object is present in the apic connection at a specific key
-	erspanObject := func(t *testing.T, desc string, cont *testAciController,
-		key string, expected string, present bool) {
+	// erspanObject := func(t *testing.T, desc string, cont *testAciController,
+	// key string, expected string, present bool) {
 
-		tu.WaitFor(t, desc, 500*time.Millisecond,
-			func(last bool) (bool, error) {
-				cont.indexMutex.Lock()
-				defer cont.indexMutex.Unlock()
-				var ok bool
-				ds := cont.apicConn.GetDesiredState(key)
-				for _, v := range ds {
-					if _, ok = v[expected]; ok {
-						break
-					}
-				}
-				if ok == present {
-					return true, nil
-				}
-				return false, nil
-			})
-		cont.log.Info("Finished waiting for ", desc)
+	// tu.WaitFor(t, desc, 500*time.Millisecond,
+	// func(last bool) (bool, error) {
+	// cont.indexMutex.Lock()
+	// defer cont.indexMutex.Unlock()
+	// var ok bool
+	// ds := cont.apicConn.GetDesiredState(key)
+	// for _, v := range ds {
+	// if _, ok = v[expected]; ok {
+	// break
+	// }
+	// }
+	// if ok == present {
+	// return true, nil
+	// }
+	// return false, nil
+	// })
+	// cont.log.Info("Finished waiting for ", desc)
 
-	}
+	// }
 	cont.run()
 	for _, pt := range podifTests {
 		cont := initCont()
@@ -267,21 +232,24 @@ func TestErspanPolicy(t *testing.T) {
 	}
 	cont.stop()
 
-	for _, spanTest := range spanTests {
+	for _, st := range spanTests {
 		cont := initCont()
-		cont.log.Info("Testing erspan post to APIC ", spanTest.desc)
-		addPods(cont, true, ips, true)
 		cont.run()
-		cont.fakeErspanPolicySource.Modify(spanTest.erspanPol)
-		erspanObject(t, "object absent check", cont, name, "spanVSrcGrp", false)
-		erspanObject(t, "object absent check", cont, name, "spanVDestGrp", false)
-		actualPost := spanTest.writeToApic
-		expectedPost := cont.handleErspanUpdate(spanTest.erspanPol)
-		assert.Equal(t, actualPost, expectedPost)
+		cont.log.Info("Testing erspan create for ", st.name)
+		spanObj := spanpolicydata(st.name, st.namespace, st.dest, st.source, st.labels)
+		cont.log.Info("Testing erspan obj", spanObj)
+		cont.fakeErspanPolicySource.Add(spanObj)
+		cont.log.Debug("Erspan Added: ", spanObj)
+		//erspanObject(t, "object absent check", cont, st.name, "spanVSrcGrp", false)
+		cont.stop()
+	}
 
-		cont.log.Info("Testing erspan delete", spanTest.desc)
-		cont.fakeNetflowPolicySource.Delete(spanTest.erspanPol)
-		checkDeleteErspan(t, spanTests[0], cont)
+	for _, st := range spanTests {
+		cont := initCont()
+		cont.run()
+		cont.log.Info("Testing erspan delete")
+		spanObj := spanpolicydata(st.name, st.namespace, st.dest, st.source, st.labels)
+		cont.fakeErspanPolicySource.Delete(spanObj)
 		cont.stop()
 	}
 
