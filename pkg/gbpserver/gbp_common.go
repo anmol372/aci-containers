@@ -25,62 +25,63 @@ import (
 )
 
 const (
-	propName          = "name"
-	propIntraPolicy   = "intraGroupPolicy"
-	defIntraPolicy    = "allow"
-	subjRoot          = "DmtreeRoot"
-	subjEPG           = "GbpEpGroup"
-	subjEPGToFD       = "GbpEpGroupToNetworkRSrc"
-	subjEPGToSnet     = "GbpEpGroupToSubnetsRSrc"
-	subjEPGToCC       = "GbpEpGroupToConsContractRSrc"
-	subjEPGToPC       = "GbpEpGroupToProvContractRSrc"
-	subjFD            = "GbpFloodDomain"
-	subjFDMcast       = "GbpeFloodContext"
-	subjFDToBD        = "GbpFloodDomainToNetworkRSrc"
-	subjBD            = "GbpBridgeDomain"
-	subjEIC           = "GbpeInstContext"
-	subjBDToVrf       = "GbpBridgeDomainToNetworkRSrc"
-	subjBDToSubnets   = "GbpForwardingBehavioralGroupToSubnetsRSrc"
-	subjContract      = "GbpContract"
-	subjSubject       = "GbpSubject"
-	subjRule          = "GbpRule"
-	subjClassRsrc     = "GbpRuleToClassifierRSrc"
-	subjL24Class      = "GbpeL24Classifier"
-	subjAction        = "GbpAllowDenyAction"
-	subjActionRsrc    = "GbpRuleToActionRSrc"
-	subjVRF           = "GbpRoutingDomain"
-	subjVRFIntSubnets = "GbpRoutingDomainToIntSubnetsRSrc"
-	subjSubnetSet     = "GbpSubnets"
-	subjSubnet        = "GbpSubnet"
-	subjSecGroup      = "GbpSecGroup"
-	subjSGSubj        = "GbpSecGroupSubject"
-	subjSGRule        = "GbpSecGroupRule"
-	subjSGRuleToCidr  = "GbpSecGroupRuleToRemoteAddressRSrc"
-	propRoutingMode   = "routingMode"
-	defRoutingMode    = "enabled"
-	propEncapID       = "encapId"
-	propClassID       = "classid"
-	propTarget        = "target"
-	propGw            = "virtualRouterIp"
-	propPrefix        = "prefixLen"
-	propNw            = "address"
-	propMac           = "macAddress"
-	propEther         = "etherT"
-	propProt          = "prot"
-	propDToPort       = "dToPort"
-	propDFromPort     = "dFromPort"
-	propSToPort       = "sToPort"
-	propSFromPort     = "sFromPort"
-	defSubnets        = "allsubnets"
-	nodeSubnets       = "nodesubnets"
-	defVrfName        = "defaultVrf"
-	defBDName         = "defaultBD"
-	defFDName         = "defaultFD"
-	nodeBDName        = "nodeBD"
-	nodeFDName        = "nodeFD"
-	defMcastGroup     = "225.0.193.80"
-	nodeMcastGroup    = "225.0.193.81"
-	propMcast         = "multicastGroupIP"
+	propName           = "name"
+	propIntraPolicy    = "intraGroupPolicy"
+	defIntraPolicy     = "allow"
+	subjRoot           = "DmtreeRoot"
+	subjEPG            = "GbpEpGroup"
+	subjEPGToFD        = "GbpEpGroupToNetworkRSrc"
+	subjEPGToSnet      = "GbpEpGroupToSubnetsRSrc"
+	subjEPGToCC        = "GbpEpGroupToConsContractRSrc"
+	subjEPGToPC        = "GbpEpGroupToProvContractRSrc"
+	subjFD             = "GbpFloodDomain"
+	subjFDMcast        = "GbpeFloodContext"
+	subjFDToBD         = "GbpFloodDomainToNetworkRSrc"
+	subjBD             = "GbpBridgeDomain"
+	subjEIC            = "GbpeInstContext"
+	subjBDToVrf        = "GbpBridgeDomainToNetworkRSrc"
+	subjBDToSubnets    = "GbpForwardingBehavioralGroupToSubnetsRSrc"
+	subjContract       = "GbpContract"
+	subjSubject        = "GbpSubject"
+	subjRule           = "GbpRule"
+	subjClassRsrc      = "GbpRuleToClassifierRSrc"
+	subjL24Class       = "GbpeL24Classifier"
+	subjAction         = "GbpAllowDenyAction"
+	subjActionRsrc     = "GbpRuleToActionRSrc"
+	subjVRF            = "GbpRoutingDomain"
+	subjVRFIntSubnets  = "GbpRoutingDomainToIntSubnetsRSrc"
+	subjSubnetSet      = "GbpSubnets"
+	subjSubnet         = "GbpSubnet"
+	subjSecGroup       = "GbpSecGroup"
+	subjSGSubj         = "GbpSecGroupSubject"
+	subjSGRule         = "GbpSecGroupRule"
+	subjSGRuleToCidr   = "GbpSecGroupRuleToRemoteAddressRSrc"
+	propRoutingMode    = "routingMode"
+	defRoutingMode     = "enabled"
+	propEncapID        = "encapId"
+	propClassID        = "classid"
+	propTarget         = "target"
+	propGw             = "virtualRouterIp"
+	propPrefix         = "prefixLen"
+	propNw             = "address"
+	propMac            = "macAddress"
+	propEther          = "etherT"
+	propProt           = "prot"
+	propDToPort        = "dToPort"
+	propDFromPort      = "dFromPort"
+	propSToPort        = "sToPort"
+	propSFromPort      = "sFromPort"
+	defSubnets         = "allsubnets"
+	nodeSubnets        = "nodesubnets"
+	defVrfName         = "defaultVrf"
+	defBDName          = "defaultBD"
+	defFDName          = "defaultFD"
+	nodeBDName         = "nodeBD"
+	nodeFDName         = "nodeFD"
+	defMcastGroup      = "225.0.193.80"
+	nodeMcastGroup     = "225.0.193.81"
+	propMcast          = "multicastGroupIP"
+	defSpanSessionName = "default-session"
 	// make cAPIC happy
 	defEPGName      = "kubernetes|kube-default"
 	kubeSysEPGName  = "kubernetes|kube-system"
@@ -552,6 +553,7 @@ func CreateRoot(config *GBPServerConfig) {
 		"DomainConfig",
 		"InvUniverse",
 		"PolicyUniverse",
+		"SpanUniverse",
 	}
 
 	for _, c := range rootChildren {
@@ -604,4 +606,22 @@ func CreateRoot(config *GBPServerConfig) {
 		ReferenceUri: "/InvUniverse/InvRemoteEndpointInventory/",
 	}
 	dcToREI.AddProperty(propTarget, refP)
+
+	//attach SpanSession to SpanUniverse
+	spUniMo := getMoDB()["/SpanUniverse/"]
+	if spUniMo == nil {
+		log.Fatal("SpanUniverse not found")
+	}
+	spanMO := createChild(spUniMo, "SpanSession", defSpanSessionName)
+	spanProps := []struct {
+		Name string
+		Data string
+	}{
+		{Name: "name", Data: defSpanSessionName},
+		{Name: "state", Data: "on"},
+	}
+
+	for _, v := range spanProps {
+		spanMO.AddProperty(v.Name, v.Data)
+	}
 }

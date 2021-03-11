@@ -7,7 +7,8 @@
             "/GbpeVMUniverse/",
             "/DomainConfig/",
             "/InvUniverse/",
-            "/PolicyUniverse/"
+            "/PolicyUniverse/",
+			"/SpanUniverse/"
         ]
     },
     {
@@ -52,6 +53,33 @@
         "parent_subject": "DomainConfig",
         "parent_uri": "/DomainConfig/",
         "parent_relation": "DomainConfigToRemoteEndpointInventoryRSrc"
+    },
+	{
+        "subject": "SpanUniverse",
+        "uri": "/SpanUniverse/",
+        "children": [
+            "/SpanUniverse/SpanSession/default-session/"
+        ],
+        "parent_subject": "DmtreeRoot",
+        "parent_uri": "/",
+        "parent_relation": "SpanUniverse"
+    },
+	{
+        "subject": "SpanSession",
+        "uri": "/SpanUniverse/SpanSession/default-session/",
+        "properties": [
+            {
+                "name": "name",
+                "data": "default-session"
+            },
+            {
+                "name": "state",
+                "data":"on"
+            }
+        ],
+        "parent_subject": "SpanUniverse",
+        "parent_uri": "/SpanUniverse/",
+        "parent_relation": "SpanSession"
     },
     {
         "subject": "GbpeVMUniverse",

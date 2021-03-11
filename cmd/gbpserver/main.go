@@ -107,6 +107,10 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("Starting netflow watcher : %v", err)
 	}
+	spw, err := watchers.NewErspanWatcher(s)
+	if err != nil {
+		logrus.Fatalf("Starting erspan watcher : %v", err)
+	}
 
 	stopCh := make(chan struct{})
 	if cfg.Apic == nil || cfg.Apic.Hosts == nil {
@@ -124,6 +128,9 @@ func main() {
 
 	if nfw != nil {
 		nfw.InitNetflowInformer(stopCh)
+	}
+	if spw != nil {
+		spw.InitErspanInformer(stopCh)
 	}
 
 	select {}
