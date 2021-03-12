@@ -124,7 +124,7 @@ func netpol(namespace string, name string, podSelector *metav1.LabelSelector,
 			Namespace: namespace,
 		},
 		Spec: v1net.NetworkPolicySpec{
-			PolicyTypes: ptypes,
+			PolicyTypes: np.spec.ptypes,
 			PodSelector: *podSelector,
 			Ingress:     irules,
 			Egress:      erules,

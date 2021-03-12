@@ -18,7 +18,11 @@
 package util
 
 import (
+	"context"
+	v1netpol "github.com/noironetworks/aci-containers/pkg/networkpolicy/apis/netpolicy/v1"
+	v1netpolclset "github.com/noironetworks/aci-containers/pkg/networkpolicy/clientset/versioned"
 	v1net "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -27,7 +31,7 @@ func GetNetPolPolicyTypes(indexer cache.Indexer, key string) []v1net.PolicyType 
 	if !exists || err != nil {
 		return nil
 	}
-	np := npobj.(*v1net.NetworkPolicy)
+	np := npobj.(*v1netpol.NetworkPolicy)
 	if len(np.Spec.PolicyTypes) > 0 {
 		return np.Spec.PolicyTypes
 	}
@@ -39,4 +43,29 @@ func GetNetPolPolicyTypes(indexer cache.Indexer, key string) []v1net.PolicyType 
 	} else {
 		return []v1net.PolicyType{v1net.PolicyTypeIngress}
 	}
+}
+
+// CreateNodeInfoCR Creates a NodeInfo CR
+func CreateNetPol(c *v1netpolclset.Clientset, netpol *v1netpol.NetworkPolicy) error {
+	_, err := c.AciV1().NetworkPolicies().Create(context.TODO(), netpol, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func UpdateNetPol(c *v1netpolclset.Clientset, netpol *v1netpol.NetworkPolicy) error {
+	_, err := c.AciV1().NetworkPolicies().Update(context.TODO(), netpol, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeleteNetPol(c *v1netpolclset.Clientset, name string) error {
+	err := c.AciV1().NetworkPolicies().Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }

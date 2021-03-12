@@ -20,7 +20,8 @@ import (
 
 	istiov1 "github.com/noironetworks/aci-containers/pkg/istiocrd/apis/aci.istio/v1"
 	istioclientset "github.com/noironetworks/aci-containers/pkg/istiocrd/clientset/versioned"
-	snatnodeinfo "github.com/noironetworks/aci-containers/pkg/nodeinfo/apis/aci.snat/v1"
+	v1netpol "github.com/noironetworks/aci-containers/pkg/networkpolicy/apis/netpolicy/v1"
+	netpolclientset "github.com/noironetworks/aci-containers/pkg/networkpolicy/clientset/versioned"
 	nodeinfoclientset "github.com/noironetworks/aci-containers/pkg/nodeinfo/clientset/versioned"
 	rdconfigclientset "github.com/noironetworks/aci-containers/pkg/rdconfig/clientset/versioned"
 	snatglobalclset "github.com/noironetworks/aci-containers/pkg/snatglobalinfo/clientset/versioned"
@@ -29,7 +30,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/yl2chen/cidranger"
 	v1 "k8s.io/api/core/v1"
-	v1net "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -59,6 +59,7 @@ type K8sEnvironment struct {
 	snatGlobalClient *snatglobalclset.Clientset
 	nodeInfoClient   *nodeinfoclientset.Clientset
 	rdConfigClient   *rdconfigclientset.Clientset
+	netPolClient     *netpolclientset.Clientset
 	istioClient      *istioclientset.Clientset
 	restConfig       *restclient.Config
 	cont             *AciController
@@ -245,20 +246,15 @@ func (env *K8sEnvironment) PrepareRun(stopCh <-chan struct{}) error {
 	cont.indexMutex.Unlock()
 	cont.snatFullSync()
 	cont.log.Info("Snat cache sync successful")
-	go cont.networkPolicyInformer.Run(stopCh)
 	go cont.processQueue(cont.podQueue, cont.podIndexer,
 		func(obj interface{}) bool {
 			return cont.handlePodUpdate(obj.(*v1.Pod))
 		}, stopCh)
 	go cont.processQueue(cont.netPolQueue, cont.networkPolicyIndexer,
 		func(obj interface{}) bool {
-			return cont.handleNetPolUpdate(obj.(*v1net.NetworkPolicy))
+			return cont.handleNetPolUpdate(obj.(*v1netpol.NetworkPolicy))
 		}, stopCh)
 	go cont.snatNodeInformer.Run(stopCh)
-	go cont.processQueue(cont.snatNodeInfoQueue, cont.snatNodeInfoIndexer,
-		func(obj interface{}) bool {
-			return cont.handleSnatNodeInfo(obj.(*snatnodeinfo.NodeInfo))
-		}, stopCh)
 	go cont.processSyncQueue(cont.syncQueue, stopCh)
 	if cont.config.InstallIstio {
 		go cont.istioInformer.Run(stopCh)
@@ -280,6 +276,7 @@ func (env *K8sEnvironment) PrepareRun(stopCh <-chan struct{}) error {
 	cont.registerCRDHook(erspanCRDName, erspanInit)
 	go cont.crdInformer.Run(stopCh)
 
+	go cont.networkPolicyInformer.Run(stopCh)
 	cache.WaitForCacheSync(stopCh,
 		cont.namespaceInformer.HasSynced,
 		cont.replicaSetInformer.HasSynced,
