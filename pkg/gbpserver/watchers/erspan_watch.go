@@ -29,7 +29,7 @@ import (
 
 const (
 	spanUniSub       = "SpanUniverse"
-	erspanParentSub  = "SpanSession"
+	erspanSessionSub = "SpanSession"
 	erspanSrcGrpSub  = "SpanSrcGrp"
 	erspanSrcSub     = "SpanSrcMember"
 	erspanRefRSrcSub = "SpanMemberToRefRSrc"
@@ -38,12 +38,37 @@ const (
 	erspanDstSumSub  = "SpanDstSummary"
 )
 
-type erspanCRD struct {
+type erspanSession struct {
 	Name       string `json:"name"`
 	AdminState string `json:"adminState,omitempty"`
-	Direction  string `json:"direction,omitempty"`
-	DestIP     string `json:"destIP"`
-	FlowID     int    `json:"flowID,omitempty"`
+}
+
+type erspanSrcGrp struct {
+	Name string `json:"name"`
+}
+
+type erspanSrcMember struct {
+	Name      string `json:"name"`
+	Direction string `json:"direction,omitempty"`
+}
+
+type erspanMemberToRefRSrc struct {
+	Name   string `json:"name"`
+	Target string
+}
+
+type erspanDstGrp struct {
+	Name string `json:"name"`
+}
+
+type erspanDstMember struct {
+	Name string `json:"name"`
+}
+
+type erspanDstSummary struct {
+	Name   string `json:"name"`
+	DestIP string `json:"destIP"`
+	FlowID int    `json:"flowID,omitempty"`
 }
 
 type ErspanWatcher struct {
@@ -107,14 +132,22 @@ func (spw *ErspanWatcher) erspanAdded(obj interface{}) {
 		return
 	}
 	spw.log.Infof("erspanAdded - %s", span.ObjectMeta.Name)
-	erspanMO := &erspanCRD{
+	erspanSessionMO := &erspanSession{
 		Name:       span.ObjectMeta.Name,
 		AdminState: span.Spec.Source.AdminState,
-		Direction:  span.Spec.Source.Direction,
-		DestIP:     span.Spec.Dest.DestIP,
-		FlowID:     span.Spec.Dest.FlowID,
+		// DestIP:     span.Spec.Dest.DestIP,
+		// FlowID:     span.Spec.Dest.FlowID,
 	}
-	spw.gs.AddGBPCustomMo(erspanMO)
+	spw.gs.AddGBPCustomMo(erspanSessionMO)
+	srcGrpMO := &erspanSrcGrp{
+		Name: span.ObjectMeta.Name,
+	}
+	spw.gs.AddGBPCustomMo(srcGrpMO)
+	srcMemberMO := &erspanSrcMember{
+		Name:      span.ObjectMeta.Name,
+		Direction: span.Spec.Source.Direction,
+	}
+	spw.gs.AddGBPCustomMo(srcMemberMO)
 }
 
 func (spw *ErspanWatcher) erspanDeleted(obj interface{}) {
@@ -124,45 +157,144 @@ func (spw *ErspanWatcher) erspanDeleted(obj interface{}) {
 		return
 	}
 	spw.log.Infof("erspanDeleted - %s", span.ObjectMeta.Name)
-	erspanMO := &erspanCRD{
+	sessionMO := &erspanSession{
 		Name:       span.ObjectMeta.Name,
 		AdminState: span.Spec.Source.AdminState,
-		Direction:  span.Spec.Source.Direction,
-		DestIP:     span.Spec.Dest.DestIP,
-		FlowID:     span.Spec.Dest.FlowID,
 	}
-	spw.gs.DelGBPCustomMo(erspanMO)
+	spw.gs.DelGBPCustomMo(sessionMO)
+	srcGrpMO := &erspanSrcGrp{
+		Name: span.ObjectMeta.Name,
+	}
+	spw.gs.DelGBPCustomMo(srcGrpMO)
+	srcMemberMO := &erspanSrcMember{
+		Name:      span.ObjectMeta.Name,
+		Direction: span.Spec.Source.Direction,
+	}
+	spw.gs.DelGBPCustomMo(srcMemberMO)
 }
 
-func (sp *erspanCRD) Subject() string {
-	return erspanSrcGrpSub
+func (session *erspanSession) Subject() string {
+	return erspanSessionSub
 }
 
-func (sp *erspanCRD) URI(gs *gbpserver.Server) string {
+func (session *erspanSession) URI(gs *gbpserver.Server) string {
 	spanParentURI := gs.GetURIBySubject(spanUniSub)
-	return fmt.Sprintf("%s%s/", spanParentURI, sp.Name)
+	return fmt.Sprintf("%s%s/%s/", spanParentURI, erspanSessionSub, session.Name)
 }
 
-func (sp *erspanCRD) Properties() map[string]interface{} {
+func (session *erspanSession) Properties() map[string]interface{} {
 
 	return map[string]interface{}{
-		"name":   sp.Name,
-		"state":  sp.AdminState,
-		"dir":    sp.Direction,
-		"dest":   sp.DestIP,
-		"flowId": sp.FlowID,
+		"name":  session.Name,
+		"state": session.AdminState,
+		// "dest":   sp.DestIP,
+		// "flowId": sp.FlowID,
 	}
 }
 
-func (sp *erspanCRD) ParentSub() string {
-	return erspanParentSub
+func (session *erspanSession) ParentSub() string {
+	return spanUniSub
 }
 
-func (sp *erspanCRD) ParentURI(gs *gbpserver.Server) string {
+func (session *erspanSession) ParentURI(gs *gbpserver.Server) string {
 	spanParentURI := gs.GetURIBySubject(spanUniSub)
 	return spanParentURI
 }
 
-func (sp *erspanCRD) Children() []string {
+func (session *erspanSession) Children() []string {
+	return []string{fmt.Sprintf("/%s/%s/%s/%s/%s/", spanUniSub, erspanSessionSub, session.Name, erspanSrcGrpSub, session.Name),
+		fmt.Sprintf("/%s/%s/%s/%s/%s/", spanUniSub, erspanSessionSub, session.Name, erspanDstGrpSub, session.Name)}
+}
+
+func (srcGrp *erspanSrcGrp) Subject() string {
+	return erspanSrcGrpSub
+}
+
+func (srcGrp *erspanSrcGrp) URI(gs *gbpserver.Server) string {
+	spanParentURI := gs.GetURIBySubject(spanUniSub)
+	return fmt.Sprintf("%s%s/%s/%s/%s/", spanParentURI, erspanSessionSub, srcGrp.Name,
+		erspanSrcGrpSub, srcGrp.Name)
+}
+
+func (srcGrp *erspanSrcGrp) Properties() map[string]interface{} {
+
+	return map[string]interface{}{
+		"name": srcGrp.Name,
+	}
+}
+
+func (srcGrp *erspanSrcGrp) ParentSub() string {
+	return erspanSessionSub
+}
+
+func (srcGrp *erspanSrcGrp) ParentURI(gs *gbpserver.Server) string {
+	spanParentURI := gs.GetURIBySubject(spanUniSub)
+	return fmt.Sprintf("%s%s/%s/", spanParentURI, erspanSessionSub, srcGrp.Name)
+}
+
+func (srcGrp *erspanSrcGrp) Children() []string {
+	return []string{fmt.Sprintf("/%s/%s/%s/%s/%s/%s/%s/", spanUniSub, erspanSessionSub,
+		srcGrp.Name, erspanSrcGrpSub, srcGrp.Name, erspanSrcSub, srcGrp.Name)}
+}
+
+func (SrcMember *erspanSrcMember) Subject() string {
+	return erspanSrcSub
+}
+
+func (SrcMember *erspanSrcMember) URI(gs *gbpserver.Server) string {
+	spanParentURI := gs.GetURIBySubject(spanUniSub)
+	return fmt.Sprintf("%s%s/%s/%s/%s/%s/%s/", spanParentURI, erspanSessionSub, SrcMember.Name,
+		erspanSrcGrpSub, SrcMember.Name, erspanSrcSub, SrcMember.Name)
+}
+
+func (SrcMember *erspanSrcMember) Properties() map[string]interface{} {
+
+	return map[string]interface{}{
+		"name": SrcMember.Name,
+		"dir":  SrcMember.Direction,
+	}
+}
+
+func (SrcMember *erspanSrcMember) ParentSub() string {
+	return erspanSrcGrpSub
+}
+
+func (SrcMember *erspanSrcMember) ParentURI(gs *gbpserver.Server) string {
+	spanParentURI := gs.GetURIBySubject(spanUniSub)
+	return fmt.Sprintf("%s%s/%s/%s/%s/", spanParentURI, erspanSessionSub, SrcMember.Name,
+		erspanSrcGrpSub, SrcMember.Name)
+}
+
+func (SrcMember *erspanSrcMember) Children() []string {
+	return []string{fmt.Sprintf("/%s/%s/%s/%s/%s/%s/%s/%s/", spanUniSub, erspanSessionSub,
+		SrcMember.Name, erspanSrcGrpSub, SrcMember.Name, erspanSrcSub, SrcMember.Name, erspanRefRSrcSub)}
+}
+
+func (SrcRef *erspanMemberToRefRSrc) Subject() string {
+	return erspanSrcSub
+}
+
+func (SrcRef *erspanMemberToRefRSrc) URI(gs *gbpserver.Server) string {
+	spanParentURI := gs.GetURIBySubject(spanUniSub)
+	return fmt.Sprintf("%s%s/%s/%s/%s/%s/%s/%s/", spanParentURI, erspanSessionSub, SrcRef.Name,
+		erspanSrcGrpSub, SrcRef.Name, erspanSrcSub, SrcRef.Name, erspanRefRSrcSub)
+}
+
+func (SrcRef *erspanMemberToRefRSrc) Properties() map[string]interface{} {
+
+	return map[string]interface{}{}
+}
+
+func (SrcRef *erspanMemberToRefRSrc) ParentSub() string {
+	return erspanSrcGrpSub
+}
+
+func (SrcRef *erspanMemberToRefRSrc) ParentURI(gs *gbpserver.Server) string {
+	spanParentURI := gs.GetURIBySubject(spanUniSub)
+	return fmt.Sprintf("%s%s/%s/%s/%s/%s/%s/", spanParentURI, erspanSessionSub, SrcRef.Name,
+		erspanSrcGrpSub, SrcRef.Name, erspanSrcSub, SrcRef.Name)
+}
+
+func (SrcRef *erspanMemberToRefRSrc) Children() []string {
 	return []string{}
 }

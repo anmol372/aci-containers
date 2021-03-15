@@ -145,6 +145,7 @@ func TestGetURIBySubject(t *testing.T) {
 	}{
 		{"DomainConfig", "/DomainConfig/"},
 		{"PlatformConfig", "/PolicyUniverse/PlatformConfig/comp%2fprov-Kubernetes%2fctrlr-%5btestDom%5d-testDom%2fsw-InsiemeLSOid/"},
+		{"SpanUniverse", "/SpanUniverse/"},
 	}
 
 	suite := &testSuite{}
