@@ -51,6 +51,8 @@ type opflexServiceMapping struct {
 
 	Conntrack bool   `json:"conntrack-enabled"`
 	NodePort  uint16 `json:"node-port,omitempty"`
+
+	ServiceDomainName string `json:"service-domain-name,omitempty"`
 }
 
 type opflexService struct {
@@ -600,6 +602,17 @@ func (sep *serviceEndpoint) SetOpflexService(ofas *opflexService, as *v1.Service
 				Conntrack:    true,
 				NodePort:     uint16(sp.NodePort),
 			}
+			switch as.Spec.Type {
+			case v1.ServiceTypeClusterIP:
+				sm.ServiceDomainName = serviceDomainName(as)
+			case v1.ServiceTypeNodePort:
+				sm.ServiceDomainName = serviceDomainName(as)
+			case v1.ServiceTypeLoadBalancer:
+				// Hostname is only populated on AWS setups
+				sm.ServiceDomainName = as.Status.LoadBalancer.Ingress[0].Hostname
+			case v1.ServiceTypeExternalName:
+				sm.ServiceDomainName = as.Spec.ExternalName
+			}
 
 			if external {
 				if as.Spec.Type == v1.ServiceTypeLoadBalancer &&
@@ -663,6 +676,17 @@ func (seps *serviceEndpointSlice) SetOpflexService(ofas *opflexService, as *v1.S
 				NextHopPort:  uint16(*p.Port),
 				Conntrack:    true,
 				NodePort:     uint16(sp.NodePort),
+			}
+			switch as.Spec.Type {
+			case v1.ServiceTypeClusterIP:
+				sm.ServiceDomainName = serviceDomainName(as)
+			case v1.ServiceTypeNodePort:
+				sm.ServiceDomainName = serviceDomainName(as)
+			case v1.ServiceTypeLoadBalancer:
+				// Hostname is only populated on AWS setups
+				sm.ServiceDomainName = as.Status.LoadBalancer.Ingress[0].Hostname
+			case v1.ServiceTypeExternalName:
+				sm.ServiceDomainName = as.Spec.ExternalName
 			}
 
 			if external {
@@ -813,4 +837,9 @@ func (agent *HostAgent) deleteServIpFromEp(suid string) {
 		}
 		delete(agent.servicetoPodUids, suid)
 	}
+}
+
+func serviceDomainName(service *v1.Service) string {
+	svcDomName := fmt.Sprintf("%s.%s", service.ObjectMeta.Name, service.ObjectMeta.Namespace)
+	return svcDomName
 }
