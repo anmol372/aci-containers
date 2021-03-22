@@ -410,6 +410,7 @@ func (c *Controller) CreateAciContainersOperatorCR() error {
 	log.Info("Unmarshalling the Config-Map...")
 	err = json.Unmarshal(raw, &obj.Spec)
 	if err != nil {
+		c.Logger.Error(err)
 		log.Error(err)
 		return err
 	}
@@ -433,7 +434,8 @@ func (c *Controller) CreateAciContainersOperatorCR() error {
 }
 
 func (c *Controller) Run(stopCh <-chan struct{}) {
-	c.Logger.Info("Controller.Run: initiating")
+	c.Logger.Info("Controller.Run: initiating yyyyyyyyyyyyyyyyyyyy")
+	c.Logger.Info("!!!!!!!!!!!!!!!MY comment")
 	log.Info("Checking if acicnioperator CR already present")
 	acicnioperator, err := c.GetAciContainersOperatorCR()
 	if err != nil {

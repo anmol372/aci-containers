@@ -57,7 +57,7 @@ STATIC_BUILD_CMD ?= CGO_ENABLED=0 GOOS=linux ${BUILD_CMD} \
         -X ${PKG_NAME_ACI_CONTAINERS_OPERATOR}.buildTime=$(shell date -u +%m-%d-%Y.%H:%M:%S.UTC) \
         -X ${PKG_NAME_ACI_CONTAINERS_OPERATOR}.gitCommit=${GIT_COMMIT} \
          -s -w" -a -installsuffix cgo
-DOCKER_BUILD_CMD ?= docker build
+DOCKER_BUILD_CMD ?= docker build --no-cache
 
 .PHONY: clean goinstall check all
 

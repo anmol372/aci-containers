@@ -23,7 +23,8 @@ type AciContainersOperatorSpec struct {
 	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
 	Flavor            string `json:"flavor"`
 	Config            string `json:"config"`
-	AccProvisionInput AccProvisionSpec `json:"acc_provision_input"`
+	Test              string `json:"test"`
+	//AccProvisionInput AccProvisionSpec `json:"acc_provision_input"`
 }
 
 type AccProvisionSpec struct {
