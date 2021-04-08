@@ -49,8 +49,9 @@ type opflexServiceMapping struct {
 	NextHopIps  []string `json:"next-hop-ips"`
 	NextHopPort uint16   `json:"next-hop-port,omitempty"`
 
-	Conntrack bool   `json:"conntrack-enabled"`
-	NodePort  uint16 `json:"node-port,omitempty"`
+	Conntrack       bool                         `json:"conntrack-enabled"`
+	NodePort        uint16                       `json:"node-port,omitempty"`
+	SessionAffinity *opflexSessionAffinityConfig `json:"session-affinity,omitempty"`
 }
 
 type opflexService struct {
@@ -69,6 +70,19 @@ type opflexService struct {
 	ServiceMappings []opflexServiceMapping `json:"service-mapping"`
 
 	Attributes map[string]string `json:"attributes,omitempty"`
+}
+
+type opflexSessionAffinityConfig struct {
+	// clientIP contains the configurations of Client IP based session affinity.
+	ClientIP opflexClientIPConfig `json:"client_ip,omitempty"`
+}
+
+// ClientIPConfig represents the configurations of Client IP based session affinity.
+type opflexClientIPConfig struct {
+	// timeoutSeconds specifies the seconds of ClientIP type session sticky time.
+	// The value must be >0 && <=86400(for 1 day) if ServiceAffinity == "ClientIP".
+	// Default value is 10800(for 3 hours).
+	TimeoutSeconds int32 `json:"timeout_seconds,omitempty"`
 }
 
 // Name of the Openshift Service
@@ -601,6 +615,9 @@ func (sep *serviceEndpoint) SetOpflexService(ofas *opflexService, as *v1.Service
 			} else {
 				sm.ServiceIp = as.Spec.ClusterIP
 			}
+			if as.Spec.SessionAffinityConfig != nil && as.Spec.SessionAffinity == "ClientIP" {
+				sm.SessionAffinity = getSessionAffinity(as.Spec.SessionAffinityConfig)
+			}
 			for _, a := range e.Addresses {
 				if !external ||
 					(a.NodeName != nil && *a.NodeName == agent.config.NodeName) {
@@ -616,7 +633,16 @@ func (sep *serviceEndpoint) SetOpflexService(ofas *opflexService, as *v1.Service
 	return hasValidMapping
 }
 
-func CheckKeyMatch(topology, nodelabels map[string]string, key string) bool {
+func getSessionAffinity(config *v1.SessionAffinityConfig) *opflexSessionAffinityConfig {
+	if config.ClientIP != nil && config.ClientIP.TimeoutSeconds != nil {
+		return &opflexSessionAffinityConfig{ClientIP: opflexClientIPConfig{TimeoutSeconds: *config.ClientIP.TimeoutSeconds}}
+	} else {
+		// Default value is 10800(for 3 hours)
+		return &opflexSessionAffinityConfig{ClientIP: opflexClientIPConfig{TimeoutSeconds: 10800}}
+	}
+}
+
+func checkKeyMatch(topology, nodelabels map[string]string, key string) bool {
 	val1, ok1 := topology[key]
 	val2, ok2 := nodelabels[key]
 	if ok1 && ok2 {
@@ -686,7 +712,7 @@ func (seps *serviceEndpointSlice) SetOpflexService(ofas *opflexService, as *v1.S
 							nexthops["any"] = append(nexthops["any"], a)
 						} else {
 							for _, key := range as.Spec.TopologyKeys {
-								if CheckKeyMatch(e.Topology, node.ObjectMeta.Labels, key) {
+								if checkKeyMatch(e.Topology, node.ObjectMeta.Labels, key) {
 									nexthops[key] = append(nexthops[key], a)
 								}
 							}
@@ -709,6 +735,9 @@ func (seps *serviceEndpointSlice) SetOpflexService(ofas *opflexService, as *v1.S
 			}
 			if sm.ServiceIp != "" && len(sm.NextHopIps) > 0 {
 				hasValidMapping = true
+			}
+			if as.Spec.SessionAffinityConfig != nil && as.Spec.SessionAffinity == "ClientIP" {
+				sm.SessionAffinity = getSessionAffinity(as.Spec.SessionAffinityConfig)
 			}
 			ofas.ServiceMappings = append(ofas.ServiceMappings, *sm)
 		}
