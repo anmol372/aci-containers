@@ -67,22 +67,43 @@ class CallerContract(unittest.TestCase):
         build=self.workflow['jobs']['build-runtime' if 'opflex' in self.path.name else 'build-and-publish']
         prepare=next(s for s in build['steps'] if s['name']=='Prepare immutable image evidence')
         publish=next(s for s in build['steps'] if s['name']=='Publish prepared image status')
-        # Supply real hashFiles result through a zero-arg fixture function after extracting its actual call.
-        expression=re.sub(r"hashFiles\('[^']+'\)","'metadata-present'",prepare['if'])
-        self.assertTrue(evaluate(expression,{'_success':False}))
-        expression=re.sub(r"hashFiles\('[^']+'\)","''",prepare['if'])
-        self.assertFalse(evaluate(expression,{'_success':False}))
+        builder=next(s for s in build['steps'] if s.get('id')=='build')
+        self.assertIn('build-push-',builder['run'])
+        for outcome,present,expected in [('success',False,True),('success',True,True),
+                                         ('failure',False,False),('failure',True,True)]:
+            expression=re.sub(r"hashFiles\('[^']+'\)","'metadata-present'" if present else "''",prepare['if'])
+            context={'_success':outcome=='success','steps':{'build':{'outcome':outcome}}}
+            self.assertEqual(evaluate(expression,context),expected,(outcome,present))
         context={'_success':False,'env':{'SKIP_CICD_STATUS':'false'},'steps':{'evidence':{'outputs':{'prepared':'true'}}}}
         self.assertTrue(evaluate(publish['if'],context))
         context['steps']['evidence']['outputs']['prepared']=''
         self.assertFalse(evaluate(publish['if'],context))
-        self.assertNotIn('env',prepare)
+        self.assertEqual(prepare['env'],{'IMAGE_BUILD_OUTCOME':'${{ steps.build.outcome }}'})
+        images=re.search(r'--expected-images "([^"]+)"',publish['run'])[1]
+        self.assertIn('--expected-images "'+images+'"',prepare['run'])
         for step in build['steps']:
             if 'build-push-' in step.get('run',''):
                 self.assertIn('SKIP_CICD_STATUS=true',step['run'])
                 self.assertNotIn('TRAVIS_TAGGER',str(step))
         cleanup=next(i for i,s in enumerate(build['steps']) if s['name']=='Remove registry credentials')
         self.assertLess(cleanup,build['steps'].index(prepare))
+
+    def test_actual_image_evidence_step_rejects_missing_or_empty_metadata_before_helper(self):
+        if self.acc:return
+        build=self.workflow['jobs']['build-runtime' if 'opflex' in self.path.name else 'build-and-publish']
+        prepare=next(s for s in build['steps'] if s['name']=='Prepare immutable image evidence')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);artifacts=root/'ci-artifacts';artifacts.mkdir()
+            env={**os.environ,'CI_ARTIFACT_DIR':str(artifacts),'CICD_DIR':str(root/'no-helper'),
+                 'IMAGE_BUILD_OUTCOME':'success','GITHUB_OUTPUT':str(root/'output')}
+            for present in (False,True):
+                with self.subTest(empty_file=present):
+                    if present:(artifacts/'image-metadata.jsonl').write_text('')
+                    result=subprocess.run(['bash','-c',prepare['run']],env=env,cwd=root,capture_output=True,text=True,timeout=10)
+                    self.assertNotEqual(result.returncode,0)
+                    self.assertIn('no nonempty image metadata',result.stdout+result.stderr)
+                    self.assertNotIn('no-helper',result.stdout+result.stderr)
+                    self.assertFalse((root/'output').exists())
 
     def test_acc_jobs_isolate_build_upload_status_and_require_production_policy(self):
         if not self.acc:return

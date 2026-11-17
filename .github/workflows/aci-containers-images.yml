@@ -228,6 +228,7 @@ jobs:
             docker login quay.io --username "${QUAY_NOIRO_USERNAME}" --password-stdin
 
       - name: Build images through shared CICD scripts
+        id: build
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -245,10 +246,19 @@ jobs:
 
       - name: Prepare immutable image evidence
         id: evidence
-        if: ${{ always() && hashFiles('ci-artifacts/image-metadata.jsonl') != '' }}
+        if: ${{ always() && (steps.build.outcome == 'success' || hashFiles('ci-artifacts/image-metadata.jsonl') != '') }}
         shell: bash
+        env:
+          IMAGE_BUILD_OUTCOME: ${{ steps.build.outcome }}
         run: |
           set -Eeuo pipefail
+          [[ -s "${CI_ARTIFACT_DIR}/image-metadata.jsonl" ]] || {
+            echo "::error::Image build produced no nonempty image metadata"; exit 1;
+          }
+          args=()
+          if [[ "${IMAGE_BUILD_OUTCOME}" == success ]]; then
+            args+=(--expected-images "aci-containers-host,aci-containers-host-ovscni,aci-containers-controller,aci-containers-operator,aci-containers-webhook,aci-containers-certmanager,cnideploy,openvswitch")
+          fi
           python3 "${CICD_DIR}/travis/ci_evidence.py" prepare-images \
             --metadata "${CI_ARTIFACT_DIR}/image-metadata.jsonl" \
             --bundle "${CI_ARTIFACT_DIR}/status-bundle" \
@@ -256,7 +266,7 @@ jobs:
             --source-sha "${TRAVIS_COMMIT}" --run-id "${GITHUB_RUN_ID}" \
             --run-number "${GITHUB_RUN_NUMBER}" --run-attempt "${GITHUB_RUN_ATTEMPT}" \
             --run-url "${TRAVIS_JOB_WEB_URL}" --trigger-tag "${GITHUB_REF_NAME}" \
-            --upstream-id "${UPSTREAM_ID}"
+            --upstream-id "${UPSTREAM_ID}" "${args[@]}"
           echo "prepared=true" >> "${GITHUB_OUTPUT}"
 
       - name: Publish prepared image status
