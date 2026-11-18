@@ -117,7 +117,7 @@ jobs:
     env:
       SOURCE_BRANCH: ${{ vars.SOURCE_BRANCH || 'master' }}
       UPSTREAM_ID: ${{ vars.UPSTREAM_ID }}
-      CICD_COMMIT: ed481aacc481c16aeee26290120b7a08a8680c67
+      CICD_COMMIT: a378a7de1179c091684d265a74629db7c6d5f528
       SKIP_CICD_STATUS: ${{ vars.SKIP_CICD_STATUS || 'true' }}
       CI_ARTIFACT_DIR: ci-artifacts
       CI_EVIDENCE_MODE: prepared-v1
@@ -266,7 +266,7 @@ jobs:
             --source-sha "${TRAVIS_COMMIT}" --run-id "${GITHUB_RUN_ID}" \
             --run-number "${GITHUB_RUN_NUMBER}" --run-attempt "${GITHUB_RUN_ATTEMPT}" \
             --run-url "${TRAVIS_JOB_WEB_URL}" --trigger-tag "${GITHUB_REF_NAME}" \
-            --upstream-id "${UPSTREAM_ID}" "${args[@]}"
+            --upstream-id "${UPSTREAM_ID}" ${args[@]+"${args[@]}"}
           echo "prepared=true" >> "${GITHUB_OUTPUT}"
 
       - name: Publish prepared image status
@@ -293,4 +293,3 @@ jobs:
           path: ci-artifacts/
           if-no-files-found: warn
           retention-days: 14
-

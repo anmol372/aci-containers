@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -104,6 +105,33 @@ class CallerContract(unittest.TestCase):
                     self.assertIn('no nonempty image metadata',result.stdout+result.stderr)
                     self.assertNotIn('no-helper',result.stdout+result.stderr)
                     self.assertFalse((root/'output').exists())
+
+    def test_actual_image_evidence_step_requires_complete_cohort_only_after_success(self):
+        if self.acc:return
+        job=self.workflow['jobs']['build-runtime' if 'opflex' in self.path.name else 'build-and-publish']
+        prepare=next(s for s in job['steps'] if s['name']=='Prepare immutable image evidence')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);artifacts=root/'ci-artifacts';artifacts.mkdir()
+            (artifacts/'image-metadata.jsonl').write_text('{}\n')
+            fake=root/'python3'
+            fake.write_text('#!'+sys.executable+'\nimport json,os,sys\n'
+                            'open(os.environ["FIXTURE_ARGS"],"w").write(json.dumps(sys.argv[1:]))\n')
+            fake.chmod(0o755)
+            env={**os.environ,'PATH':str(root)+os.pathsep+os.environ['PATH'],
+                 'CI_ARTIFACT_DIR':str(artifacts),'CICD_DIR':str(root/'cicd'),
+                 'GITHUB_OUTPUT':str(root/'output'),'FIXTURE_ARGS':str(root/'args'),
+                 'TRAVIS_TAG':'6.1.2.1','GITHUB_REPOSITORY':'noironetworks/fixture',
+                 'TRAVIS_COMMIT':'a'*40,'GITHUB_RUN_ID':'123','GITHUB_RUN_NUMBER':'55',
+                 'GITHUB_RUN_ATTEMPT':'1','TRAVIS_JOB_WEB_URL':'https://example.test/run/123',
+                 'GITHUB_REF_NAME':'6.1.2.1','UPSTREAM_ID':'81c2369'}
+            for outcome in ('success','failure'):
+                with self.subTest(build_outcome=outcome):
+                    env['IMAGE_BUILD_OUTCOME']=outcome
+                    result=subprocess.run(['bash','-c',prepare['run']],env=env,cwd=root,capture_output=True,text=True,timeout=10)
+                    self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                    args=json.loads((root/'args').read_text())
+                    self.assertEqual('--expected-images' in args,outcome=='success')
+                    self.assertIn('prepared=true',(root/'output').read_text())
 
     def test_acc_jobs_isolate_build_upload_status_and_require_production_policy(self):
         if not self.acc:return
