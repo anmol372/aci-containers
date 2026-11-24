@@ -243,7 +243,7 @@ jobs:
           echo "prepared=true" >> "${GITHUB_OUTPUT}"
 
       - name: Publish prepared image status
-        if: ${{ always() && env.SKIP_CICD_STATUS == 'false' && steps.evidence.outputs.prepared == 'true' }}
+        if: ${{ always() && vars.REHEARSAL_PUBLISH_STATUS == 'true' && env.SKIP_CICD_STATUS == 'false' && steps.evidence.outputs.prepared == 'true' }}
         shell: bash
         env:
           TRAVIS_TAGGER: ${{ secrets.TEST_CICD_STATUS_TOKEN }}

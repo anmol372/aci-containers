@@ -103,6 +103,7 @@ class ImageRehearsal(unittest.TestCase):
 
     def test_actual_status_command_uses_only_fixed_test_destination(self):
         step = self.step('Publish prepared image status')
+        self.assertIn("vars.REHEARSAL_PUBLISH_STATUS == 'true'", step['if'])
         self.assertEqual(step['env'], {'TRAVIS_TAGGER': '${{ secrets.TEST_CICD_STATUS_TOKEN }}'})
         result, files = self.run_script(step['run'], binaries={'python3': 'printf "%s\\n" "$@" > "$FIXTURE_ARGS"\n'})
         self.assertEqual(result.returncode, 0, result.stderr)
