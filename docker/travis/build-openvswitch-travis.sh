@@ -26,12 +26,19 @@ echo "building base image"
 rm -Rf build/openvswitch
 mkdir -p build/openvswitch
 cp $DOCKER_DIR/Dockerfile-openvswitch-base build/openvswitch
-docker build $BUILDARG -t $DOCKER_HUB_ID/openvswitch-base:$DOCKER_TAG -f ./build/openvswitch/Dockerfile-openvswitch-base build/openvswitch &> /tmp/openvswitch-base.log &
-while [ ! -f  /tmp/openvswitch-base.log ]; do sleep 10; done
-tail -f /tmp/openvswitch-base.log | awk 'NR%100-1==0' &
-while [[ "$(pgrep -x 'docker' 2> /dev/null)" != '' ]]; do sleep 60; done
-
-tail -25 /tmp/openvswitch-base.log
+if [[ "${CI_REHEARSAL:-}" == 1 &&
+      "${GITHUB_REPOSITORY:-}" == anmol372/aci-containers &&
+      "${GITHUB_REF:-}" == refs/heads/anmrasto/gha-rehearsal-20261119 &&
+      "${GITHUB_EVENT_NAME:-}" == workflow_dispatch ]]; then
+    # Stream directly to the caller's log and wait for the actual build result.
+    docker build $BUILDARG -t "${DOCKER_HUB_ID}/openvswitch-base:${DOCKER_TAG}" -f ./build/openvswitch/Dockerfile-openvswitch-base build/openvswitch
+else
+    docker build $BUILDARG -t $DOCKER_HUB_ID/openvswitch-base:$DOCKER_TAG -f ./build/openvswitch/Dockerfile-openvswitch-base build/openvswitch &> /tmp/openvswitch-base.log &
+    while [ ! -f  /tmp/openvswitch-base.log ]; do sleep 10; done
+    tail -f /tmp/openvswitch-base.log | awk 'NR%100-1==0' &
+    while [[ "$(pgrep -x 'docker' 2> /dev/null)" != '' ]]; do sleep 60; done
+    tail -25 /tmp/openvswitch-base.log
+fi
 
 echo "copying intermediate binaries and libs"
 rm -Rf build/openvswitch/dist
